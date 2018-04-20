@@ -27,14 +27,14 @@ At least one of the above widgets must be present for the element to work.
 .['growth-y']       - Vertical growth direction. Defaults to 'UP' (string)
 .initialAnchor      - Anchor point for the icons. Defaults to 'BOTTOMLEFT' (string)
 .filter             - Custom filter list for auras to display. Defaults to 'HELPFUL' for buffs and 'HARMFUL' for
-                      debuffs (string)
+					  debuffs (string)
 
 ## Options Auras
 
 .numBuffs     - The maximum number of buffs to display. Defaults to 32 (number)
 .numDebuffs   - The maximum number of debuffs to display. Defaults to 40 (number)
 .numTotal     - The maximum number of auras to display. Prioritizes buffs over debuffs. Defaults to the sum of
-                .numBuffs and .numDebuffs (number)
+				.numBuffs and .numDebuffs (number)
 .gap          - Controls the creation of an invisible icon between buffs and debuffs. Defaults to false (boolean)
 .buffFilter   - Custom filter list for buffs to display. Takes priority over `filter` (string)
 .debuffFilter - Custom filter list for debuffs to display. Takes priority over `filter` (string)
@@ -56,13 +56,13 @@ button.isPlayer - indicates if the aura caster is the player or their vehicle (b
 
 ## Examples
 
-    -- Position and size
-    local Buffs = CreateFrame('Frame', nil, self)
-    Buffs:SetPoint('RIGHT', self, 'LEFT')
-    Buffs:SetSize(16 * 2, 16 * 16)
+	-- Position and size
+	local Buffs = CreateFrame('Frame', nil, self)
+	Buffs:SetPoint('RIGHT', self, 'LEFT')
+	Buffs:SetSize(16 * 2, 16 * 16)
 
-    -- Register with oUF
-    self.Buffs = Buffs
+	-- Register with oUF
+	self.Buffs = Buffs
 --]]
 
 local _, ns = ...
@@ -137,10 +137,8 @@ local function customFilter(element, unit, button, name)
 	end
 end
 
-local function updateIcon(element, unit, index, offset, filter, isDebuff, visible)
-	local name, rank, texture, count, debuffType, duration, expiration, caster, isStealable,
-		nameplateShowSelf, spellID, canApply, isBossDebuff, casterIsPlayer, nameplateShowAll,
-		timeMod, effect1, effect2, effect3 = UnitAura(unit, index, filter)
+local function updateIcon(element, unit, index, offset, filter, isDebuff, visible)	
+	local name, texture, count, debuffType, duration, expiration, caster, isStealable, nameplateShowPersonal, spellId, _, _, _, nameplateShowAll = UnitAura(unit, index, filter)
 
 	if(name) then
 		local position = visible + offset + 1
@@ -179,9 +177,9 @@ local function updateIcon(element, unit, index, offset, filter, isDebuff, visibl
 
 		* show - indicates whether the aura button should be shown (boolean)
 		--]]
-		local show = (element.CustomFilter or customFilter) (element, unit, button, name, rank, texture,
+		local show = (element.CustomFilter or customFilter) (element, unit, button, name, texture,
 			count, debuffType, duration, expiration, caster, isStealable, nameplateShowSelf, spellID,
-			canApply, isBossDebuff, casterIsPlayer, nameplateShowAll,timeMod, effect1, effect2, effect3)
+			canApply, isBossDebuff, casterIsPlayer, nameplateShowAll)
 
 		if(show) then
 			-- We might want to consider delaying the creation of an actual cooldown
