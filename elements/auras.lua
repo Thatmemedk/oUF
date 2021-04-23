@@ -17,7 +17,8 @@ At least one of the above widgets must be present for the element to work.
 
 .disableMouse       - Disables mouse events (boolean)
 .disableCooldown    - Disables the cooldown spiral (boolean)
-.size               - Aura icon size. Defaults to 16 (number)
+.width              - Aura width size. Defaults to 16 (number)
+.height             - Aura height size. Defaults to 16 (number)
 .onlyShowPlayer     - Shows only auras created by player/vehicle (boolean)
 .showStealableBuffs - Displays the stealable texture on buffs that can be stolen (boolean)
 .spacing            - Spacing between each icon. Defaults to 0 (number)
@@ -27,14 +28,16 @@ At least one of the above widgets must be present for the element to work.
 .['growth-y']       - Vertical growth direction. Defaults to 'UP' (string)
 .initialAnchor      - Anchor point for the icons. Defaults to 'BOTTOMLEFT' (string)
 .filter             - Custom filter list for auras to display. Defaults to 'HELPFUL' for buffs and 'HARMFUL' for
-                      debuffs (string)
+					  debuffs (string)
+.tooltipAnchor      - Anchor point for the tooltip. Defaults to 'ANCHOR_BOTTOMRIGHT', however, if a frame has anchoring
+					  restrictions it will be set to 'ANCHOR_CURSOR' (string)
 
 ## Options Auras
 
 .numBuffs     - The maximum number of buffs to display. Defaults to 32 (number)
 .numDebuffs   - The maximum number of debuffs to display. Defaults to 40 (number)
 .numTotal     - The maximum number of auras to display. Prioritizes buffs over debuffs. Defaults to the sum of
-                .numBuffs and .numDebuffs (number)
+				.numBuffs and .numDebuffs (number)
 .gap          - Controls the creation of an invisible icon between buffs and debuffs. Defaults to false (boolean)
 .buffFilter   - Custom filter list for buffs to display. Takes priority over `filter` (string)
 .debuffFilter - Custom filter list for debuffs to display. Takes priority over `filter` (string)
@@ -56,13 +59,13 @@ button.isPlayer - indicates if the aura caster is the player or their vehicle (b
 
 ## Examples
 
-    -- Position and size
-    local Buffs = CreateFrame('Frame', nil, self)
-    Buffs:SetPoint('RIGHT', self, 'LEFT')
-    Buffs:SetSize(16 * 2, 16 * 16)
+	-- Position and size
+	local Buffs = CreateFrame('Frame', nil, self)
+	Buffs:SetPoint('RIGHT', self, 'LEFT')
+	Buffs:SetSize(16 * 2, 16 * 16)
 
-    -- Register with oUF
-    self.Buffs = Buffs
+	-- Register with oUF
+	self.Buffs = Buffs
 --]]
 
 local _, ns = ...
@@ -72,17 +75,24 @@ local VISIBLE = 1
 local HIDDEN = 0
 
 local function UpdateTooltip(self)
+	if(GameTooltip:IsForbidden()) then return end
+
 	GameTooltip:SetUnitAura(self:GetParent().__owner.unit, self:GetID(), self.filter)
 end
 
 local function onEnter(self)
-	if(not self:IsVisible()) then return end
+	if(GameTooltip:IsForbidden() or not self:IsVisible()) then return end
 
-	GameTooltip:SetOwner(self, 'ANCHOR_BOTTOMRIGHT')
+	-- Avoid parenting GameTooltip to frames with anchoring restrictions,
+	-- otherwise it'll inherit said restrictions which will cause issues with
+	-- its further positioning, clamping, etc
+	GameTooltip:SetOwner(self, self:GetParent().__restricted and 'ANCHOR_CURSOR' or self:GetParent().tooltipAnchor)
 	self:UpdateTooltip()
 end
 
 local function onLeave()
+	if(GameTooltip:IsForbidden()) then return end
+
 	GameTooltip:Hide()
 end
 
@@ -96,8 +106,12 @@ local function createAuraIcon(element, index)
 	local icon = button:CreateTexture(nil, 'BORDER')
 	icon:SetAllPoints()
 
-	local count = button:CreateFontString(nil, 'OVERLAY', 'NumberFontNormal')
-	count:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -1, 0)
+	local countFrame = CreateFrame('Frame', nil, button)
+	countFrame:SetAllPoints(button)
+	countFrame:SetFrameLevel(cd:GetFrameLevel() + 1)
+
+	local count = countFrame:CreateFontString(nil, 'OVERLAY', 'NumberFontNormal')
+	count:SetPoint('BOTTOMRIGHT', countFrame, 'BOTTOMRIGHT', -1, 0)
 
 	local overlay = button:CreateTexture(nil, 'OVERLAY')
 	overlay:SetTexture([[Interface\Buttons\UI-Debuff-Overlays]])
@@ -138,7 +152,7 @@ local function customFilter(element, unit, button, name)
 end
 
 local function updateIcon(element, unit, index, offset, filter, isDebuff, visible)
-	local name, rank, texture, count, debuffType, duration, expiration, caster, isStealable,
+	local name, texture, count, debuffType, duration, expiration, caster, isStealable,
 		nameplateShowSelf, spellID, canApply, isBossDebuff, casterIsPlayer, nameplateShowAll,
 		timeMod, effect1, effect2, effect3 = UnitAura(unit, index, filter)
 
@@ -179,7 +193,7 @@ local function updateIcon(element, unit, index, offset, filter, isDebuff, visibl
 
 		* show - indicates whether the aura button should be shown (boolean)
 		--]]
-		local show = (element.CustomFilter or customFilter) (element, unit, button, name, rank, texture,
+		local show = (element.CustomFilter or customFilter) (element, unit, button, name, texture,
 			count, debuffType, duration, expiration, caster, isStealable, nameplateShowSelf, spellID,
 			canApply, isBossDebuff, casterIsPlayer, nameplateShowAll,timeMod, effect1, effect2, effect3)
 
@@ -218,8 +232,9 @@ local function updateIcon(element, unit, index, offset, filter, isDebuff, visibl
 			if(button.icon) then button.icon:SetTexture(texture) end
 			if(button.count) then button.count:SetText(count > 1 and count) end
 
-			local size = element.size or 16
-			button:SetSize(size, size)
+			local width = element.width or 16
+			local height = element.height or 16
+			button:SetSize(width, height)
 
 			button:EnableMouse(not element.disableMouse)
 			button:SetID(index)
@@ -250,8 +265,8 @@ local function updateIcon(element, unit, index, offset, filter, isDebuff, visibl
 end
 
 local function SetPosition(element, from, to)
-	local sizex = (element.size or 16) + (element['spacing-x'] or element.spacing or 0)
-	local sizey = (element.size or 16) + (element['spacing-y'] or element.spacing or 0)
+	local sizex = (element.width or 16) + (element['spacing-x'] or element.spacing or 0)
+	local sizey = (element.height or 16) + (element['spacing-y'] or element.spacing or 0)
 	local anchor = element.initialAnchor or 'BOTTOMLEFT'
 	local growthx = (element['growth-x'] == 'LEFT' and -1) or 1
 	local growthy = (element['growth-y'] == 'DOWN' and -1) or 1
@@ -479,10 +494,13 @@ local function Enable(self)
 		local buffs = self.Buffs
 		if(buffs) then
 			buffs.__owner = self
+			-- check if there's any anchoring restrictions
+			buffs.__restricted = not pcall(self.GetCenter, self)
 			buffs.ForceUpdate = ForceUpdate
 
 			buffs.createdIcons = buffs.createdIcons or 0
 			buffs.anchoredIcons = 0
+			buffs.tooltipAnchor = buffs.tooltipAnchor or 'ANCHOR_BOTTOMRIGHT'
 
 			buffs:Show()
 		end
@@ -490,10 +508,13 @@ local function Enable(self)
 		local debuffs = self.Debuffs
 		if(debuffs) then
 			debuffs.__owner = self
+			-- check if there's any anchoring restrictions
+			debuffs.__restricted = not pcall(self.GetCenter, self)
 			debuffs.ForceUpdate = ForceUpdate
 
 			debuffs.createdIcons = debuffs.createdIcons or 0
 			debuffs.anchoredIcons = 0
+			debuffs.tooltipAnchor = debuffs.tooltipAnchor or 'ANCHOR_BOTTOMRIGHT'
 
 			debuffs:Show()
 		end
@@ -501,10 +522,13 @@ local function Enable(self)
 		local auras = self.Auras
 		if(auras) then
 			auras.__owner = self
+			-- check if there's any anchoring restrictions
+			auras.__restricted = not pcall(self.GetCenter, self)
 			auras.ForceUpdate = ForceUpdate
 
 			auras.createdIcons = auras.createdIcons or 0
 			auras.anchoredIcons = 0
+			auras.tooltipAnchor = auras.tooltipAnchor or 'ANCHOR_BOTTOMRIGHT'
 
 			auras:Show()
 		end
